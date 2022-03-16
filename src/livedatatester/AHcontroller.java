@@ -1,8 +1,6 @@
 package livedatatester;
 
 import java.util.ArrayList;
-import java.awt.event.ActionListener;
-import com.ib.client.Contract;
 import com.ib.controller.ApiConnection.ILogger;
 import com.ib.controller.ApiController;
 import com.ib.controller.ApiController.IConnectionHandler;
@@ -28,12 +26,8 @@ public class AHcontroller implements IConnectionHandler {
     private boolean mTWSconnected = false;
    
     public AHcontroller() {
-        mLogger = java.util.logging.Logger.getLogger("AHTrader");     
+        mLogger = java.util.logging.Logger.getLogger("LiveDataTester");     
     }
-    
-//    public LiveData liveData() {
-//        return mLiveData;
-//    }
     
     public static void start( AHcontroller ah_controller, int clientId) {
         INSTANCE = ah_controller;
@@ -82,6 +76,7 @@ public class AHcontroller implements IConnectionHandler {
     
     @Override
     public void error(Exception e){
+        JOptionPane.showMessageDialog(null, "IB API error: " + e.toString());
         show(e.toString());        
     }
     
@@ -98,13 +93,6 @@ public class AHcontroller implements IConnectionHandler {
     public void show(String msg) {
         if (msg.length() > 0) {        
             mLogger.info("[IB API (show)] - " + msg);
-        }
-        
-        //critical errors - show and log no matter what 
-        if (msg.toLowerCase().contains("requested market data is not subscribed")) {
-            mLogger.info("Critical error: failed to start live data stream: " + msg);
-            JOptionPane.showMessageDialog(null, "Critical error trying to start the live data stream.\n" +             
-                                          "Error message: " + msg);
         }
     }
     

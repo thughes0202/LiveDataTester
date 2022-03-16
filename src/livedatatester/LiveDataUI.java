@@ -5,12 +5,18 @@ import com.ib.client.Contract;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.text.DateFormat;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalTime;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
 
 public class LiveDataUI extends javax.swing.JFrame {
@@ -19,11 +25,13 @@ public class LiveDataUI extends javax.swing.JFrame {
     private Contract mContract;
     private BTLoggerHandler mLoggerHandler;
     private final static Logger mLogger = Logger.getLogger("LiveDataTester");
+    
+    private ArrayList<Bar> mStreamingBars = new ArrayList<>();
+    private ArrayList<Bar> mRealtimeBars = new ArrayList<>();
 
     public LiveDataUI() {
         initComponents();   
         
-        //set up handler for logging window
         //set up handler for logging window
         mLoggerHandler = new BTLoggerHandler();
         LogFormatter_General ahLogFormatter = new LogFormatter_General();
@@ -41,23 +49,65 @@ public class LiveDataUI extends javax.swing.JFrame {
         mContract.symbol("ES");         
         mLiveData = new LiveDataNT(mContract);
         
-        ActionListener streamListener = (ActionEvent event) -> {
-            Bar bar = (Bar) event.getSource();
-            processStreamBar(bar);
-        };
+        mLiveData.setStreamingListener(streamListener);
+        mLiveData.setBarListener(realtimeBarListener);
+        
+    }    
     
-        ActionListener realtimeBarListener = (ActionEvent event) -> {
-            Bar bar = (Bar) event.getSource();
-            processRealtimeBar(bar);
-        };
+    private ActionListener streamListener = (ActionEvent event) -> {
+        Bar bar = (Bar) event.getSource();
+        mStreamingBars.add(bar);
+        processStreamBar(bar);
+    };
+
+    private ActionListener realtimeBarListener = (ActionEvent event) -> {
+        Bar bar = (Bar) event.getSource();
+        mRealtimeBars.add(bar);
+        processRealtimeBar(bar);
+    };
+
+    private void updateBarTable(boolean stream) {
+        SwingUtilities.invokeLater(new Runnable(){
+            @Override
+            public void run() {       
+
+                ArrayList<Bar> barList;
+                DefaultTableModel model;
+                if (stream) {
+                    model = (DefaultTableModel)tblStreaming.getModel();
+                    barList = mStreamingBars;
+                } else {
+                    model = (DefaultTableModel)tblRealtimeBars.getModel();
+                    barList = mRealtimeBars;
+                }
+                
+                DecimalFormat priceFormat = new DecimalFormat("######.00"); 
+                DecimalFormat volFormat = new DecimalFormat("###,###,###.##");
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss:SSS");        
+                
+                int row = 0;
+                for (Bar bar : barList) {
+                    model.setValueAt(dtf.format(LocalTime.now()), row, 0);
+                    model.setValueAt(dtf.format(AHutil.barLocalTime(bar.time())), row, 1);
+                    model.setValueAt(priceFormat.format(bar.open()), row, 2);
+                    model.setValueAt(priceFormat.format(bar.high()), row, 3);
+                    model.setValueAt(priceFormat.format(bar.low()), row, 4);
+                    model.setValueAt(priceFormat.format(bar.close()), row, 5);
+                    model.setValueAt(volFormat.format(bar.volume()), row, 6);
+                    row++;
+                }
+            }
+        });                
     }    
     
     private void processStreamBar(Bar bar) {
-        
+        mLogger.info("processing stream bar (for checking how long it took to get here from LiveDataNT)");
+        updateBarTable(true);    
     }
     
     private void processRealtimeBar(Bar bar) {
-        
+        mLogger.info("processing realtime bar (for checking how long it took to get here from LiveDataNT)");
+        updateBarTable(false);        
     }
 
     @SuppressWarnings("unchecked")
@@ -95,20 +145,116 @@ public class LiveDataUI extends javax.swing.JFrame {
 
         tblRealtimeBars.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null}
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null}
             },
             new String [] {
-                "Date/Time", "Open", "High", "Low", "Close", "Volume"
+                "Now", "Bar Time", "Open", "High", "Low", "Close", "Volume"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Object.class
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
             boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false
+                false, false, false, false, false, false, false
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -137,20 +283,116 @@ public class LiveDataUI extends javax.swing.JFrame {
 
         tblStreaming.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null}
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null},
+                {null, null, null, null, null, null, null}
             },
             new String [] {
-                "Date/Time", "Open", "High", "Low", "Close", "Volume"
+                "Now", "Bar Time", "Open", "High", "Low", "Close", "Volume"
             }
         ) {
             Class[] types = new Class [] {
-                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
             boolean[] canEdit = new boolean [] {
-                false, false, false, false, true, true
+                false, false, false, false, false, true, true
             };
 
             public Class getColumnClass(int columnIndex) {
@@ -214,6 +456,7 @@ public class LiveDataUI extends javax.swing.JFrame {
 
     private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
         start();
+        btnStart.setEnabled(false);
     }//GEN-LAST:event_btnStartActionPerformed
 
     public static void main(String args[]) {
@@ -250,7 +493,7 @@ public class LiveDataUI extends javax.swing.JFrame {
     
     //customer logger handler to format the data and show it to our logging window
     private class BTLoggerHandler extends Handler {
-        private final DateFormat df = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss.SSS");
+        private final DateFormat df = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss:SSS");
         
         @Override
         public void publish(LogRecord record) {

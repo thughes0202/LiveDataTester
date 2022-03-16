@@ -6,20 +6,13 @@ import com.ib.client.Types;
 import com.ib.controller.ApiController;
 import com.ib.controller.ApiController.TopMktDataAdapter;
 import com.ib.controller.Bar;
-import com.ib.controller.Formats;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-import java.text.DecimalFormat;
-import java.time.LocalDate;
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Logger;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.GregorianCalendar;
 
 public class LiveDataNT extends TopMktDataAdapter implements ApiController.IRealTimeBarHandler {
@@ -55,14 +48,11 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
     
     public LiveDataNT(Contract contract) {
         mContract = contract;
-        
-        mLogger.info("test 2");
-        
         AHcontroller.start(new AHcontroller(), 0);
         AHcontroller.INSTANCE.controller().client().reqMarketDataType(1);
-        mLogger.info("starting live data stream for " + contract.symbol());
+        mLogger.info("setting market date type to live");
 
-        //startTimer();
+        startTimer();
         startLiveData();
     }
     
@@ -78,9 +68,13 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         mPriceListener = listener;
     }
 
-    public synchronized void startLiveData() {
+    private void startLiveData() {
         AHcontroller.INSTANCE.controller().reqTopMktData(mContract, "", false, this);
-        //AHcontroller.INSTANCE.controller().reqRealTimeBars(mContract, Types.WhatToShow.TRADES, false, this);        
+        mLogger.info("starting live streaming data for " + mContract.symbol());
+        
+        AHcontroller.INSTANCE.miscDelay(500);
+        AHcontroller.INSTANCE.controller().reqRealTimeBars(mContract, Types.WhatToShow.TRADES, false, this);        
+        mLogger.info("starting realtime bars for " + mContract.symbol());    
         
         //set initial collection values
         mOpen = 0;  
@@ -92,7 +86,7 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
     }
     
     //sometimes IB stops sending bars, this restarts them
-    public synchronized void restartBars() {
+    public void restartBars() {
         AHcontroller.INSTANCE.controller().cancelRealtimeBars(this);
         AHcontroller.INSTANCE.miscDelay(500);
         AHcontroller.INSTANCE.controller().reqRealTimeBars(mContract, Types.WhatToShow.TRADES, false, this);        
@@ -118,11 +112,14 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
             waitMilliseconds = ((29 - seconds) * 1000) + (1000 - milliseconds);
         }
         
+        mLogger.info("initializing stream timer");
         mTimer30.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                mLogger.info("in streaming timer");    
+
                 //create and send the streaming bar
-                Bar bar = new Bar(mBarTime, mOpen, mHigh, mLow, mClose, 0, mVolume, 0);                
+                Bar bar = new Bar(mBarTime, mHigh, mLow, mOpen, mClose, 0, mVolume, 0);    
                 sendStreamBar(bar);
                 
                 //init for next collection 
@@ -132,11 +129,21 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
                 mLow = mOpen;
                 mClose = mOpen;
                 mVolume = 0;
+                mLogger.info("out streaming timer");    
             }                
         }, waitMilliseconds, 30000);                                                                        
+        
+        mLogger.info("starttimer seconds: " + seconds);
+        mLogger.info("starttimer msec: " + milliseconds);
+        mLogger.info("starttimer msec wait: " + waitMilliseconds);        
     }
     
     private void newPrice(double price) {
+        
+        //set open, if not already set
+        if (mOpen == 0) {
+            mOpen = price;
+        }
         
         //update high/low
         mHigh = price > mHigh ? price : mHigh;
@@ -148,12 +155,15 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         //volume?
     }
 
-    private synchronized void sendStreamBar(Bar bar) {      
+    private void sendStreamBar(Bar bar) {      
 
         if (mStreamBarListener != null) {
+            mLogger.info("sending bar to stream listener (for checking transit time...)");            
             try {
-                ActionEvent event = new ActionEvent(bar, 0, "");                
-                mStreamBarListener.actionPerformed(event);                        
+                if (bar.open() != 0 && bar.time() != 0) {
+                    ActionEvent event = new ActionEvent(bar, 0, "");                
+                    mStreamBarListener.actionPerformed(event);                        
+                }
 
             } catch (Exception ex) {
                 mLogger.info("exception caught in AutoTrader in LiveData thread:" + ex.getMessage());
@@ -161,7 +171,7 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         }
     }
     
-    private synchronized void sendRTBar(Bar bar) {      
+    private void sendRTBar(Bar bar) {      
 
         if (mRTBarListener != null) {
             try {
@@ -178,7 +188,7 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         return mContract.symbol();
     }
 
-    private synchronized void sendLastPriceToListener(double price) {
+    private void sendLastPriceToListener(double price) {
         if (mPriceListener != null) {
             try {
                 ActionEvent event = new ActionEvent(price, 0, "");                
@@ -200,7 +210,6 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
             case LAST: case DELAYED_LAST:
                 newPrice(price);
                 mLogger.info(String.format("tickType: %s, value: %f", tickType.field(), price));                        
-//                }
                 break;
             case OPEN: case DELAYED_OPEN:
 //                m_todayOpen = price;
@@ -242,8 +251,8 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
 
     @Override 
     public void realtimeBar(Bar bar5) {
-        mLogger.info("5sec bar: " + csvBarLine(bar5));
-        LocalTime time = barLocalTime(bar5.time());                
+        mLogger.info("5sec bar: " + AHutil.csvBarLine(bar5));
+        LocalTime time = AHutil.barLocalTime(bar5.time());                
         int second = time.getSecond();
 
         //if we're building the first ever record, skip bar until
@@ -258,14 +267,17 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         }
 
         //copy the bar before processing it...in case we get another event
-        Bar bar = new Bar(bar5.time(), bar5.high(), bar5.low(), bar5.open(), bar5.close(), 0, bar5.volume(), 0);                                    
-        if (second == 0 || second == 30) {
-            init30SecBar(bar);
-        } else if (second == 25 || second == 55) {
-            update30SecBar(bar);
-            finalize30SecBar(bar);
-        } else {
-            update30SecBar(bar);
+        Bar bar = new Bar(bar5.time(), bar5.high(), bar5.low(), bar5.open(), bar5.close(), 0, bar5.volume(), 0);  
+        switch (second) {
+            case 0: case 30:
+                init30SecBar(bar);
+                break;
+            case 25: case 55:
+                update30SecBar(bar);
+                finalize30SecBar(bar);
+                break;
+            default : 
+                update30SecBar(bar);
         }
         mLogger.info("exiting realtimeBar");                
     }
@@ -274,11 +286,11 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
 
         mLogger.info("initializing 30sec bar from 5sec bar");                
 
-        m30SecTime = barTimeLong(barLocalDateTime(bar5.time()));
+        m30SecTime = AHutil.barTimeLong(AHutil.barLocalDateTime(bar5.time()));
 
         DateTimeFormatter tf = DateTimeFormatter.ofPattern("HH:mm:ss");                
-        mLogger.info("actual first bar timestamp: " + tf.format(barLocalTime(bar5.time())));
-        mLogger.info("timestamp for 30sec record to be created: " + tf.format(barLocalTime(m30SecTime)));
+        mLogger.info("actual first bar timestamp: " + tf.format(AHutil.barLocalTime(bar5.time())));
+        mLogger.info("timestamp for 30sec record to be created: " + tf.format(AHutil.barLocalTime(m30SecTime)));
 
         mBarTimeRTB = bar5.time();
         mOpenRTB = bar5.open();
@@ -288,7 +300,7 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
 
         //if this open is the same as the previous close, set flag
         //to replace the open value with the first different open
-        mReplaceOpen = mOpenRTB == mLastCloseRTB;
+        //mReplaceOpen = mOpenRTB == mLastCloseRTB;
 
         //watch out for zero low. if found, set to arbitrarily high value
         if (mLowRTB == 0) {
@@ -311,17 +323,21 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         new Timer().schedule(new TimerTask() {
             @Override
             public void run() {
+                mLogger.info("in RT timer");    
                 //create and send the streaming bar
-                Bar rtBar = new Bar(mBarTimeRTB, mOpenRTB, mHighRTB, mLowRTB, mCloseRTB, 0, mVolumeRTB, 0);                
-                //send it
+                Bar rtBar = new Bar(mBarTimeRTB, mHighRTB, mLowRTB, mOpenRTB, mCloseRTB, 0, mVolumeRTB, 0);    
+                mLogger.info("final 30sec RTB bar: " + AHutil.csvBarLine(rtBar));
+                mLogger.info("sending bar to RTB listener (for checking transit time...)");                            
+                sendRTBar(rtBar);
                 
                 //init for next collection 
-                mBarTime = new GregorianCalendar().getTimeInMillis() / 1000;                
-                mOpen = mClose;
-                mHigh = mOpen;
-                mLow = mOpen;
-                mClose = mOpen;
+                mBarTimeRTB = new GregorianCalendar().getTimeInMillis() / 1000;                
+                mOpenRTB = mCloseRTB;
+                mHighRTB = mOpenRTB;
+                mLowRTB = mOpenRTB;
+                mCloseRTB = mOpenRTB;
                 mVolume = 0;
+                mLogger.info("out RT timer");    
                 
             }
         }, 1);
@@ -364,59 +380,5 @@ public class LiveDataNT extends TopMktDataAdapter implements ApiController.IReal
         
         mLogger.info("exiting update30SecBar");
     }            
-    
-    public static synchronized String csvBarLine(Bar bar) {        
-        return logBar(bar) + "\n";
-    }
-    
-    public static synchronized String logBar(Bar bar) {        
-        DecimalFormat pf = new DecimalFormat("####.00");        
-        DecimalFormat vf = new DecimalFormat("#########");        
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        
-        StringBuilder sb = new StringBuilder();
-        LocalDateTime dt = barLocalDateTime(bar.time());
-        sb.append(dtf.format(dt)).append(",");        
-        sb.append(pf.format(bar.open())).append(",");
-        sb.append(pf.format(bar.high())).append(",");
-        sb.append(pf.format(bar.low())).append(",");
-        sb.append(pf.format(bar.close())).append(",");
-        sb.append(vf.format(bar.volume())).append(",");
-        sb.append(vf.format(bar.count())).append(",");
-        sb.append(pf.format(bar.wap()));
-        return sb.toString();
-    }
-    
-    public static synchronized  Date barDateTime(long time) {
-        //convert bar time to Date
-        Date d = null;        
-        try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            String s = "20" + Formats.fmtDate(time * 1000).substring(2,19);
-            d = sdf.parse(s);
-        } catch (Exception ex) {
-            ex.printStackTrace();        
-        }
-        return d;
-    }
-   
-    public static synchronized  LocalDateTime barLocalDateTime(long time) {
-        //convert bartime to LocalDateTime
-        Date d = barDateTime(time);  
-        return LocalDateTime.ofInstant(d.toInstant(), ZoneId.systemDefault());   
-    }     
-    
-    public static synchronized  LocalDate barLocalDate(long time) {
-        return barLocalDateTime(time).toLocalDate();     
-    }
-    
-    public static synchronized LocalTime barLocalTime(long time) {
-        return barLocalDateTime(time).toLocalTime();
-    }
-    
-    public static synchronized  long barTimeLong(LocalDateTime ldt) {
-        //seconds from java epoch + seconds between TWS and java epochs
-        return ldt.toEpochSecond(ZoneId.systemDefault().getRules().getOffset(ldt));
-    }
 
 }
